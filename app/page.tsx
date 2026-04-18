@@ -19,17 +19,17 @@ export default function Home() {
     const roomCode = generateRoomCode();
 
     const { data: room, error: roomError } = await supabase
-      .from("rooms")
+      .from("Rooms")
       .insert({ room_code: roomCode, status: "waiting", host_name: trimmedNickname, num_rounds: 3 })
       .select()
       .single();
 
     if (roomError || !room) {
-      alert("Failed to create room. Please try again.");
+      alert("Failed to create room: " + roomError?.message);
       return;
     }
 
-    await supabase.from("players").insert({
+    await supabase.from("People").insert({
       room_id: room.id,
       nickname: trimmedNickname,
       score: 0,
@@ -58,17 +58,21 @@ export default function Home() {
     }
 
     const { data: room, error: roomError } = await supabase
-      .from("rooms")
+      .from("Rooms")
       .select()
       .eq("room_code", trimmedJoinCode)
-      .single();
+      .maybeSingle();
 
-    if (roomError || !room) {
-      alert("Room not found. Check the code and try again.");
+    if (roomError) {
+      alert("Error looking up room: " + roomError.message);
+      return;
+    }
+    if (!room) {
+      alert(`No room found with code "${trimmedJoinCode}". Double-check the code.`);
       return;
     }
 
-    await supabase.from("players").insert({
+    await supabase.from("People").insert({
       room_id: room.id,
       nickname: trimmedNickname,
       score: 0,
