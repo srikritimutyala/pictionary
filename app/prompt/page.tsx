@@ -111,8 +111,8 @@ const PromptCreator = () => {
             {card.forbidden.map((word: string) => (
               <span key={word} style={{
                 ...styles.tag,
-                backgroundColor: prompt.toLowerCase().includes(word.toLowerCase()) ? '#ef4444' : '#fff',
-                color: prompt.toLowerCase().includes(word.toLowerCase()) ? '#fff' : '#b91c1c'
+                backgroundColor: prompt.toLowerCase().includes(word.toLowerCase()) ? '#000000' : '#fff',
+                color: prompt.toLowerCase().includes(word.toLowerCase()) ? '#fff' : '#000000'
               }}>
                 {word}
               </span>
@@ -122,7 +122,7 @@ const PromptCreator = () => {
 
         <div style={styles.inputHeader}>
           <label style={{ fontWeight: 'bold' }}>WRITE YOUR PROMPT</label>
-          <span style={{ color: validation.count > maxWords ? '#ef4444' : '#64748b' }}>
+          <span style={{ color: validation.count > maxWords ? '#000000' : '#000000' }}>
             {validation.count}/{maxWords}
           </span>
         </div>
@@ -130,7 +130,7 @@ const PromptCreator = () => {
         <textarea
           style={{
             ...styles.textarea,
-            borderColor: validation.hasForbidden ? '#ef4444' : '#e2e8f0'
+            borderColor: validation.hasForbidden ? '#000000' : '#e2e8f0'
           }}
           value={prompt}
           onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
@@ -139,7 +139,7 @@ const PromptCreator = () => {
         />
 
         {validation.hasForbidden && (
-          <p style={{color: '#ef4444', fontSize: '0.8rem', marginTop: '4px'}}>
+          <p style={{color: '#000000', fontSize: '0.8rem', marginTop: '4px'}}>
             Remove forbidden words to submit!
           </p>
         )}
@@ -148,7 +148,7 @@ const PromptCreator = () => {
           <div style={styles.timerLabel}>TIME LEFT</div>
           <div style={{ 
             ...styles.timerDisplay, 
-            color: timeLeft < 30 ? '#ef4444' : '#6366f1' 
+            color: timeLeft < 30 ? '#000000' : '#000000' 
           }}>
             {formatTime(timeLeft)}
           </div>
@@ -167,10 +167,10 @@ const PromptCreator = () => {
         </button>
 
         <div style={styles.tipsBox}>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '0.8rem' }}>💡 PROMPT TIPS</div>
+          <div style={{ fontWeight: 'bold', color:'#000000', marginBottom: '8px', fontSize: '0.8rem' }}>💡 PROMPT TIPS</div>
           <ul style={styles.tipsList}>
             <li>✓ Use sensory details and geometry</li>
-            <li><span style={{ color: '#ef4444' }}>✗</span> No exact synonyms of forbidden words</li>
+            <li><span style={{ color: '#000000' }}>✗</span> No exact synonyms of forbidden words</li>
           </ul>
         </div>
       </div>
@@ -182,23 +182,23 @@ const PromptCreator = () => {
 const styles: { [key: string]: any } = {
   body: { display: 'flex', justifyContent: 'center', background: '#f8fafc', minHeight: '100vh', padding: '20px', fontFamily: 'system-ui, sans-serif' },
   container: { maxWidth: '450px', width: '100%', background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', height: 'fit-content' },
-  headerTag: { color: '#0000FF', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px' },
-  title: { fontSize: '1.5rem', margin: '8px 0', color: '#00FF00' },
-  subLabel: { fontSize: '0.7rem', color: '#FF00FF', marginBottom: '4px', fontWeight: 'bold' },
-  targetWord: { background: '#e0e7ff', color: '#0000FF', padding: '1rem', borderRadius: '8px', textAlign: 'center', fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' },
-  description: { fontSize: '0.85rem', color: '#00FFFF', marginBottom: '1rem' },
-  forbiddenBox: { background: '#fff1f1', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.2rem' },
-  forbiddenTitle: { color: '#FF0000', fontWeight: 'bold', fontSize: '0.7rem', marginBottom: '8px' },
+  headerTag: { color: '#000000', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px' },
+  title: { fontSize: '1.5rem', margin: '8px 0', color: '#000000' },
+  subLabel: { fontSize: '0.7rem', color: '#000000', marginBottom: '4px', fontWeight: 'bold' },
+  targetWord: { background: '#e0e7ff', color: '#000000', padding: '1rem', borderRadius: '8px', textAlign: 'center', fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' },
+  description: { fontSize: '0.85rem', color: '#000000', marginBottom: '1rem' },
+  forbiddenBox: { background: '#fff1f1', border: '1px solid #000000', padding: '1rem', borderRadius: '8px', marginBottom: '1.2rem' },
+  forbiddenTitle: { color: '#000000', fontWeight: 'bold', fontSize: '0.7rem', marginBottom: '8px' },
   tagContainer: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
-  tag: { border: '1px solid #fca5a5', padding: '2px 10px', borderRadius: '20px', fontSize: '0.8rem', transition: 'all 0.2s', color: '#FF00FF' },
-  inputHeader: { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px', color: '#00FF00' },
+  tag: { border: '1px solid #000000', padding: '2px 10px', borderRadius: '20px', fontSize: '0.8rem', transition: 'all 0.2s', color: '#000000' },
+  inputHeader: { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px', color: '#000000' },
   textarea: { width: '100%', height: '100px', padding: '12px', borderRadius: '8px', border: '2px solid #e2e8f0', fontSize: '1rem', boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.2s', color: '#0000FF' },
   timerSection: { textAlign: 'center', margin: '15px 0' },
-  timerLabel: { fontSize: '0.7rem', fontWeight: 'bold', color: '#00FF00' },
-  timerDisplay: { fontSize: '1.6rem', fontWeight: 'bold', color: '#00FFFF' },
-  submitBtn: { width: '100%', padding: '0.8rem', background: '#0000FF', color: '#FFFF00', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem' },
+  timerLabel: { fontSize: '0.7rem', fontWeight: 'bold', color: '#000000' },
+  timerDisplay: { fontSize: '1.6rem', fontWeight: 'bold', color: '#000000' },
+  submitBtn: { width: '100%', padding: '0.8rem', background: '#000000', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem' },
   tipsBox: { background: '#f1f5f9', padding: '0.8rem', borderRadius: '8px', marginTop: '1.2rem' },
-  tipsList: { listStyle: 'none', padding: 0, fontSize: '0.8rem', margin: 0, color: '#FF0000' }
+  tipsList: { listStyle: 'none', padding: 0, fontSize: '0.8rem', margin: 0, color: '#000000' }
 };
 
 export default PromptCreator;
