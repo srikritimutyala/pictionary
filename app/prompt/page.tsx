@@ -19,6 +19,8 @@ const PromptCreator = () => {
   const [timeLeft, setTimeLeft] = useState<number>(initialTime);
   const [isTimeUp, setIsTimeUp] = useState<boolean>(false);
   const [submitted, setSubmitted] = useState<boolean>(false);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [generating, setGenerating] = useState<boolean>(false);
 
   // Load random card on mount
   useEffect(() => {
@@ -63,12 +65,20 @@ const PromptCreator = () => {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validation.hasForbidden) {
       alert(`You can't submit! You used: ${validation.usedForbidden.join(', ')}`);
       return;
     }
     setSubmitted(true);
+    setGenerating(true);
+    try {
+      const puter = (window as any).puter;
+      const img = await puter.ai.txt2img(prompt);
+      setImageUrl(img.src);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   if (submitted) {
@@ -76,7 +86,16 @@ const PromptCreator = () => {
       <div style={styles.body}>
         <div style={styles.container}>
           <h1 style={{textAlign: 'center'}}>✅ Prompt Submitted!</h1>
-          <p style={{textAlign: 'center', color: '#64748b'}}>Waiting for other players to guess...</p>
+          {generating ? (
+            <p style={{textAlign: 'center', color: '#64748b'}}>Generating image...</p>
+          ) : imageUrl ? (
+            <>
+              <img src={imageUrl} alt="Generated" style={{width: '100%', borderRadius: '8px', marginTop: '1rem'}} />
+              <p style={{textAlign: 'center', color: '#64748b', marginTop: '0.5rem'}}>Waiting for other players to guess...</p>
+            </>
+          ) : (
+            <p style={{textAlign: 'center', color: '#64748b'}}>Waiting for other players to guess...</p>
+          )}
         </div>
       </div>
     );
