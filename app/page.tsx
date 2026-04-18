@@ -2,22 +2,41 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const [nickname, setNickname] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const router = useRouter();
 
-  function CreateRoom() {
-    console.log("Button clicked!");
+  async function CreateRoom() {
     const trimmedNickname = nickname.trim();
-
     if (!trimmedNickname) {
       alert("Please enter a nickname.");
       return;
     }
 
     const roomCode = generateRoomCode();
+
+    const { data: room, error: roomError } = await supabase
+      .from("rooms")
+      .insert({ room_code: roomCode, status: "waiting", host_name: trimmedNickname, num_rounds: 3 })
+      .select()
+      .single();
+
+    if (roomError || !room) {
+      alert("Failed to create room. Please try again.");
+      return;
+    }
+
+    await supabase.from("players").insert({
+      room_id: room.id,
+      nickname: trimmedNickname,
+      score: 0,
+      coins: 0,
+      is_host: true,
+    });
+
     localStorage.setItem("nickname", trimmedNickname);
     localStorage.setItem("roomCode", roomCode);
     localStorage.setItem("isHost", "true");
@@ -25,7 +44,7 @@ export default function Home() {
     router.push(`/room/${roomCode}`);
   }
 
-  function JoinRoom() {
+  async function JoinRoom() {
     const trimmedNickname = nickname.trim();
     const trimmedJoinCode = joinCode.trim().toUpperCase();
 
@@ -33,11 +52,29 @@ export default function Home() {
       alert("Please enter a nickname.");
       return;
     }
-
     if (!trimmedJoinCode) {
       alert("Please enter a room code.");
       return;
     }
+
+    const { data: room, error: roomError } = await supabase
+      .from("rooms")
+      .select()
+      .eq("room_code", trimmedJoinCode)
+      .single();
+
+    if (roomError || !room) {
+      alert("Room not found. Check the code and try again.");
+      return;
+    }
+
+    await supabase.from("players").insert({
+      room_id: room.id,
+      nickname: trimmedNickname,
+      score: 0,
+      coins: 0,
+      is_host: false,
+    });
 
     localStorage.setItem("nickname", trimmedNickname);
     localStorage.setItem("roomCode", trimmedJoinCode);
@@ -45,7 +82,6 @@ export default function Home() {
 
     router.push(`/room/${trimmedJoinCode}`);
   }
-
 
   function generateRoomCode(length = 6) {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -64,14 +100,17 @@ export default function Home() {
         value={nickname}
         onChange={(e) => setNickname(e.target.value)}
       />
-      <button onClick={CreateRoom}>Create Room</button>
-      <button onClick={JoinRoom}>Join Room</button>
-            <input
+      <input
         type="text"
         placeholder="Enter room code"
         value={joinCode}
         onChange={(e) => setJoinCode(e.target.value)}
       />
+      <button onClick={CreateRoom}>Create Room</button>
+      <button onClick={JoinRoom}>Join Room</button>
+      <button onClick={() => router.push("/guess")}>Guessing Page</button>
+      <button onClick={() => router.push("/generate")}>Generate Image</button>
+      <button onClick={() => router.push("/prompt")}>Prompt</button>
     </div>
   );
 }
