@@ -12,7 +12,7 @@ export default function Home() {
   async function CreateRoom() {
     const trimmedNickname = nickname.trim();
     if (!trimmedNickname) {
-      alert("Please enter a nickname.");
+      alert("Please enter a wnickname.");
       return;
     }
 
