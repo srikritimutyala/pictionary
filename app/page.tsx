@@ -72,6 +72,22 @@ export default function Home() {
       return;
     }
 
+    const { data: existing } = await supabase
+      .from("People")
+      .select("id, is_host")
+      .eq("room_id", room.id)
+      .eq("nickname", trimmedNickname)
+      .maybeSingle();
+
+    if (existing) {
+      // Rejoin — preserve their existing host role
+      localStorage.setItem("nickname", trimmedNickname);
+      localStorage.setItem("roomCode", trimmedJoinCode);
+      localStorage.setItem("isHost", String(existing.is_host));
+      router.push(`/room/${trimmedJoinCode}`);
+      return;
+    }
+
     await supabase.from("People").insert({
       room_id: room.id,
       nickname: trimmedNickname,

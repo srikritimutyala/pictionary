@@ -15,13 +15,10 @@ export default function RoomPage() {
   const params = useParams();
   const code = params.code as string;
   const [players, setPlayers] = useState<Player[]>([]);
-  const [nickname, setNickname] = useState("");
-  const [isHost, setIsHost] = useState(false);
-
-  useEffect(() => {
-    setNickname(localStorage.getItem("nickname") || "");
-    setIsHost(localStorage.getItem("isHost") === "true");
-  }, []);
+  const [nickname] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("nickname") || "" : ""
+  );
+  const isHost = players.find((p) => p.nickname === nickname)?.is_host ?? false;
 
   useEffect(() => {
     if (!code) return;
