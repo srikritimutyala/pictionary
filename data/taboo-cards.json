@@ -1,0 +1,202 @@
+[
+  {
+    "word": "Eiffel Tower",
+    "forbidden": ["Paris", "France", "Tower", "Steel", "Landmark"]
+  },
+  {
+    "word": "Great Wall of China",
+    "forbidden": ["Beijing", "Asia", "Bricks", "Long", "History"]
+  },
+  {
+    "word": "Statue of Liberty",
+    "forbidden": ["New York", "Green", "Torch", "Island", "America"]
+  },
+  {
+    "word": "Mona Lisa",
+    "forbidden": ["Painting", "Da Vinci", "Louvre", "Smile", "Museum"]
+  },
+  {
+    "word": "Grand Canyon",
+    "forbidden": ["Arizona", "River", "Deep", "Red", "National Park"]
+  },
+  {
+    "word": "Pyramids of Giza",
+    "forbidden": ["Egypt", "Desert", "Sphinx", "Pharaoh", "Triangle"]
+  },
+  {
+    "word": "Taj Mahal",
+    "forbidden": ["India", "White", "Marble", "Palace", "Agra"]
+  },
+  {
+    "word": "Mount Everest",
+    "forbidden": ["Himalayas", "Mountain", "Highest", "Snow", "Peak"]
+  },
+  {
+    "word": "Golden Gate Bridge",
+    "forbidden": ["San Francisco", "Red", "Suspension", "California", "Ocean"]
+  },
+  {
+    "word": "Colosseum",
+    "forbidden": ["Rome", "Italy", "Gladiator", "Arena", "Ancient"]
+  },
+  {
+    "word": "The Sun",
+    "forbidden": ["Yellow", "Hot", "Star", "Space", "Light"]
+  },
+  {
+    "word": "Astronaut",
+    "forbidden": ["Space", "NASA", "Suit", "Moon", "Rocket"]
+  },
+  {
+    "word": "Smartphone",
+    "forbidden": ["iPhone", "Screen", "App", "Call", "Cell"]
+  },
+  {
+    "word": "Laptop",
+    "forbidden": ["Computer", "Keyboard", "Screen", "Macbook", "Work"]
+  },
+  {
+    "word": "Pizza",
+    "forbidden": ["Cheese", "Italian", "Dough", "Slice", "Tomato"]
+  },
+  {
+    "word": "Hamburger",
+    "forbidden": ["Beef", "Bun", "McDonalds", "Fast Food", "Patty"]
+  },
+  {
+    "word": "Sushi",
+    "forbidden": ["Japan", "Fish", "Rice", "Raw", "Roll"]
+  },
+  {
+    "word": "Electric Guitar",
+    "forbidden": ["Music", "Rock", "Strings", "Amp", "Instrument"]
+  },
+  {
+    "word": "Football",
+    "forbidden": ["NFL", "Ball", "Sport", "Field", "Super Bowl"]
+  },
+  {
+    "word": "Tesla",
+    "forbidden": ["Electric", "Car", "Elon Musk", "Battery", "Vehicle"]
+  },
+  {
+    "word": "Starbucks",
+    "forbidden": ["Coffee", "Latte", "Green", "Cup", "Drink"]
+  },
+  {
+    "word": "Minecraft",
+    "forbidden": ["Blocks", "Game", "Creeper", "Video", "Pixels"]
+  },
+  {
+    "word": "Harry Potter",
+    "forbidden": ["Wizard", "Magic", "Wand", "Glasses", "Hogwarts"]
+  },
+  {
+    "word": "Spider-Man",
+    "forbidden": ["Marvel", "Web", "Peter Parker", "Red", "Hero"]
+  },
+  {
+    "word": "Batman",
+    "forbidden": ["DC", "Joker", "Knight", "Gotham", "Cape"]
+  },
+  {
+    "word": "Iron Man",
+    "forbidden": ["Tony Stark", "Suit", "Avenger", "Red", "Armor"]
+  },
+  {
+    "word": "Fire Truck",
+    "forbidden": ["Red", "Ladder", "Siren", "Hose", "Engine"]
+  },
+  {
+    "word": "Police Car",
+    "forbidden": ["Cop", "Blue", "Lights", "Police", "Patrol"]
+  },
+  {
+    "word": "Airplane",
+    "forbidden": ["Fly", "Pilot", "Wings", "Airport", "Sky"]
+  },
+  {
+    "word": "Submarine",
+    "forbidden": ["Underwater", "Ocean", "Navy", "Yellow", "Deep"]
+  },
+  {
+    "word": "Rainforest",
+    "forbidden": ["Jungle", "Trees", "Amazon", "Tropical", "Green"]
+  },
+  {
+    "word": "Volcano",
+    "forbidden": ["Lava", "Ash", "Eruption", "Mountain", "Magma"]
+  },
+  {
+    "word": "Penguin",
+    "forbidden": ["Antarctica", "Bird", "Black", "White", "Ice"]
+  },
+  {
+    "word": "Kangaroo",
+    "forbidden": ["Australia", "Jump", "Joey", "Pouch", "Animal"]
+  },
+  {
+    "word": "Great White Shark",
+    "forbidden": ["Ocean", "Teeth", "Fish", "Jaws", "Predator"]
+  },
+  {
+    "word": "Polar Bear",
+    "forbidden": ["Arctic", "White", "Snow", "Ice", "Animal"]
+  },
+  {
+    "word": "T-Rex",
+    "forbidden": ["Dinosaur", "Jurassic", "Teeth", "Ancient", "Fossil"]
+  },
+  {
+    "word": "Piano",
+    "forbidden": ["Keys", "Music", "Instrument", "Black", "White"]
+  },
+  {
+    "word": "Sneakers",
+    "forbidden": ["Shoes", "Nike", "Feet", "Run", "Walk"]
+  },
+  {
+    "word": "Backpack",
+    "forbidden": ["School", "Bag", "Shoulder", "Books", "Carry"]
+  },
+  {
+    "word": "Headphones",
+    "forbidden": ["Music", "Ears", "Listen", "Sound", "Wireless"]
+  },
+  {
+    "word": "Watch",
+    "forbidden": ["Time", "Wrist", "Clock", "Rolex", "Hand"]
+  },
+  {
+    "word": "Sunglasses",
+    "forbidden": ["Eyes", "Sun", "Dark", "Glasses", "Summer"]
+  },
+  {
+    "word": "Umbrella",
+    "forbidden": ["Rain", "Wet", "Water", "Sky", "Handle"]
+  },
+  {
+    "word": "Coffee Machine",
+    "forbidden": ["Brew", "Morning", "Cup", "Kitchen", "Espresso"]
+  },
+  {
+    "word": "Toothbrush",
+    "forbidden": ["Teeth", "Mouth", "Clean", "Paste", "Brush"]
+  },
+  {
+    "word": "Microscope",
+    "forbidden": ["Science", "Lab", "Bacteria", "Cells", "Lens"]
+  },
+  {
+    "word": "Telescope",
+    "forbidden": ["Stars", "Space", "Night", "Planet", "Sky"]
+  },
+  {
+    "word": "Lego",
+    "forbidden": ["Brick", "Toy", "Build", "Plastic", "Pieces"]
+  },
+  {
+    "word": "Light Bulb",
+    "forbidden": ["Electricity", "Glass", "Bright", "Lamp", "Idea"]
+  }
+]
