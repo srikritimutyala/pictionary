@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Player = {
@@ -13,6 +13,7 @@ type Player = {
 
 export default function RoomPage() {
   const params = useParams();
+  const router = useRouter();
   const code = params.code as string;
   const [players, setPlayers] = useState<Player[]>([]);
   const [nickname] = useState(() =>
@@ -40,18 +41,55 @@ export default function RoomPage() {
       if (data) setPlayers(data);
     }
 
+    async function checkAndRedirect() {
+      const { data: room } = await supabase
+        .from("Rooms")
+        .select("status")
+        .eq("room_code", code)
+        .maybeSingle();
+
+      if (room?.status === "playing") {
+        const host = localStorage.getItem("isHost") === "true";
+        router.push(host ? "/prompt" : "/guess");
+      }
+    }
+
     fetchPlayers();
 
-    // Realtime subscription to People table
     const channel = supabase
       .channel(`room-${code}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "People" }, () => {
         fetchPlayers();
       })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "Rooms" }, (payload) => {
+        if (payload.new.status === "playing") {
+          const host = localStorage.getItem("isHost") === "true";
+          router.push(host ? "/prompt" : "/guess");
+        }
+      })
       .subscribe();
 
+    checkAndRedirect();
+
     return () => { supabase.removeChannel(channel); };
-  }, [code]);
+  }, [code, router]);
+
+  async function startGame() {
+    const { data: room } = await supabase
+      .from("Rooms")
+      .select("id")
+      .eq("room_code", code)
+      .maybeSingle();
+
+    if (!room) return;
+
+    await supabase
+      .from("Rooms")
+      .update({ status: "playing" })
+      .eq("id", room.id);
+
+    router.push("/prompt");
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-zinc-50 dark:bg-black font-sans px-4">
@@ -93,7 +131,7 @@ export default function RoomPage() {
       {isHost && (
         <button
           className="mt-4 px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl"
-          onClick={() => alert("Starting game...")}
+          onClick={startGame}
         >
           Start Game
         </button>
