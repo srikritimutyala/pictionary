@@ -57,7 +57,6 @@ export default function GuessPageUI() {
     [connectedPlayers, playerStyles]
   );
 
-  const maxGuesses = 3;
   const startingInkCredits = 28;
   const startingTime = 45;
 
@@ -70,9 +69,21 @@ export default function GuessPageUI() {
   const [message, setMessage] = useState("");
   const [promptPassUsed, setPromptPassUsed] = useState(false);
   const [imageContent, setImageContent] = useState<ReactNode>(null);
+  const [promptPassUsed, setPromptPassUsed] = useState(false);
+  const [firstLetterRevealed, setFirstLetterRevealed] = useState(false);
+  const [revealedForbiddenWords, setRevealedForbiddenWords] = useState<string[]>([]);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [nickname, setNickname] = useState("");
+  const [roomCode, setRoomCode] = useState("");
 
   useEffect(() => {
-    const roomCode = localStorage.getItem("roomCode");
+    setNickname(localStorage.getItem("nickname") || "Unknown");
+    setRoomCode(localStorage.getItem("roomCode") || "");
+  }, []);
+
+  // Resolve room ID, load existing guesses, check if already guessed
+  useEffect(() => {
     if (!roomCode) return;
 
     // Load existing image on mount
@@ -126,18 +137,15 @@ export default function GuessPageUI() {
   const handleGuessSubmit = () => {
     const trimmedGuess = guessInput.trim();
 
-    if (!trimmedGuess) {
-      setMessage("Type a guess first.");
-      return;
-    }
-
-    if (guesses.length >= maxGuesses) {
+    if (!trimmedGuess) { setMessage("Type a guess first."); return; }
+    if (submitted) { setMessage("You already used all available guesses this round."); return; }
+    if (guesses.filter((g) => g.nickname === nickname).length >= maxGuesses) {
       setMessage("You already used all available guesses this round.");
       return;
     }
+    if (!roomId) { setMessage("Not connected to a room."); return; }
 
-    const loweredGuess = trimmedGuess.toLowerCase();
-    const isCorrect = loweredGuess.includes("eiffel");
+    const isCorrect = trimmedGuess.toLowerCase().includes("eiffel");
 
     const newGuess: Guess = {
       text: trimmedGuess,
@@ -147,6 +155,7 @@ export default function GuessPageUI() {
 
     setGuesses((prev) => [...prev, newGuess]);
     setGuessInput("");
+    setSubmitted(true);
 
     if (isCorrect) {
       setScoreboard((prev) =>
