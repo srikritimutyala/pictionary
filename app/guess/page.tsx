@@ -1,242 +1,442 @@
-"use client";
+'use client';
 
-import { useMemo, useState, useEffect, type KeyboardEvent, type ReactNode } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { supabase } from '@/lib/supabase';
 
-type Player = {
-  id: string;
-  color: string;
-  name: string;
-  points: number;
-  text: string;
-};
-
-type ConnectedPlayer = {
-  id: string;
-  name: string;
-};
-
-type Guess = {
+type GuessRow = {
+  id: string | number;
+  nickname: string;
   text: string;
   correct: boolean;
-  points: string;
+  createdAt?: string | null;
 };
 
+type RoomData = {
+  id: number;
+  current_image_url: string | null;
+  current_word: string | null;
+  current_forbidden_words: string[] | null;
+  current_prompt: string | null;
+  winner_nickname: string | null;
+  status: string | null;
+  guess_ends_at: string | null;
+};
+
+type PlayerChip = {
+  id: string;
+  name: string;
+  color: string;
+  text: string;
+  points: number;
+};
+
+const playerStyles = [
+  { color: 'bg-amber-400', text: 'text-amber-300' },
+  { color: 'bg-violet-500', text: 'text-violet-300' },
+  { color: 'bg-emerald-400', text: 'text-emerald-300' },
+  { color: 'bg-sky-400', text: 'text-sky-300' },
+  { color: 'bg-pink-400', text: 'text-pink-300' },
+  { color: 'bg-orange-400', text: 'text-orange-300' },
+  { color: 'bg-cyan-400', text: 'text-cyan-300' },
+  { color: 'bg-lime-400', text: 'text-lime-300' },
+];
+
+function normalizeGuess(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function guessesMatch(a: string, b: string) {
+  return normalizeGuess(a) === normalizeGuess(b);
+}
+
+function getSecondsRemaining(endsAt: string | null | undefined) {
+  if (!endsAt) return 0;
+  const diff = Math.floor((new Date(endsAt).getTime() - Date.now()) / 1000);
+  return Math.max(0, diff);
+}
+
 export default function GuessPageUI() {
-  const connectedPlayers = useMemo<ConnectedPlayer[]>(
-    () => [
-      { id: "A", name: "You" },
-      { id: "B", name: "Player B" },
-      { id: "Y", name: "Player Y" },
-    ],
-    []
-  );
+  const [roomCode, setRoomCode] = useState('');
+  const [nickname, setNickname] = useState('Unknown');
 
-  const playerStyles = useMemo(
-    () => [
-      { color: "bg-amber-400", text: "text-amber-300" },
-      { color: "bg-violet-500", text: "text-violet-300" },
-      { color: "bg-emerald-400", text: "text-emerald-300" },
-      { color: "bg-sky-400", text: "text-sky-300" },
-      { color: "bg-pink-400", text: "text-pink-300" },
-      { color: "bg-orange-400", text: "text-orange-300" },
-      { color: "bg-cyan-400", text: "text-cyan-300" },
-      { color: "bg-lime-400", text: "text-lime-300" },
-    ],
-    []
-  );
-
-  const players = useMemo<Player[]>(
-    () =>
-      connectedPlayers.map((player, index) => ({
-        ...player,
-        points: 0,
-        color: playerStyles[index % playerStyles.length].color,
-        text: playerStyles[index % playerStyles.length].text,
-      })),
-    [connectedPlayers, playerStyles]
-  );
-
-  const startingInkCredits = 28;
-  const startingTime = 45;
-
-  const [guessInput, setGuessInput] = useState("");
-  const [guesses, setGuesses] = useState<Guess[]>([]);
-  const [scoreboard, setScoreboard] = useState<Player[]>(players);
-  const [inkCredits, setInkCredits] = useState(startingInkCredits);
-  const [timeLeft, setTimeLeft] = useState(startingTime);
+  const [guessInput, setGuessInput] = useState('');
+  const [guesses, setGuesses] = useState<GuessRow[]>([]);
+  const [inkCredits, setInkCredits] = useState(28);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [message, setMessage] = useState("");
-  const [promptPassUsed, setPromptPassUsed] = useState(false);
-  const [imageContent, setImageContent] = useState<ReactNode>(null);
+  const [message, setMessage] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const [room, setRoom] = useState<RoomData | null>(null);
+  const [loadingRoom, setLoadingRoom] = useState(true);
+  const [roundOver, setRoundOver] = useState(false);
+  const [winnerName, setWinnerName] = useState<string | null>(null);
+
   const [firstLetterRevealed, setFirstLetterRevealed] = useState(false);
   const [revealedForbiddenWords, setRevealedForbiddenWords] = useState<string[]>([]);
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [nickname] = useState(() => typeof window !== "undefined" ? localStorage.getItem("nickname") || "Unknown" : "Unknown");
-  const [roomCode] = useState(() => typeof window !== "undefined" ? localStorage.getItem("roomCode") || "" : "");
 
   useEffect(() => {
-    if (!roomCode) return;
+    setRoomCode(localStorage.getItem('roomCode') || '');
+    setNickname(localStorage.getItem('nickname') || 'Unknown');
+  }, []);
 
-    let currentRoomId: number | null = null;
+  const answer = room?.current_word?.trim() || '';
+  const forbiddenWords = room?.current_forbidden_words ?? [];
+  const imageUrl = room?.current_image_url ?? '';
+  const promptUsed = room?.current_prompt ?? '';
+  const roomStatus = room?.status ?? null;
+
+  const hasImage = Boolean(imageUrl);
+  const canUseHints = Boolean(answer) && forbiddenWords.length > 0;
+  const canGuess = hasImage && roomStatus === 'guessing' && !roundOver && timeLeft > 0;
+
+  const playerNames = useMemo(() => {
+    const set = new Set<string>();
+    if (nickname.trim()) set.add(nickname.trim());
+
+    for (const guess of guesses) {
+      if (guess.nickname?.trim()) {
+        set.add(guess.nickname.trim());
+      }
+    }
+
+    return Array.from(set);
+  }, [guesses, nickname]);
+
+  const scoreboard = useMemo<PlayerChip[]>(() => {
+    return playerNames.map((name, index) => {
+      const style = playerStyles[index % playerStyles.length];
+      const playerGuesses = guesses.filter((g) => g.nickname === name);
+      const correctGuess = playerGuesses.find((g) => g.correct);
+
+      return {
+        id: `${name}-${index}`,
+        name,
+        color: style.color,
+        text: style.text,
+        points: correctGuess ? 50 : 0,
+      };
+    });
+  }, [playerNames, guesses]);
+
+  useEffect(() => {
+    if (!roomCode) {
+      setLoadingRoom(false);
+      return;
+    }
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     async function init() {
-      const { data: room } = await supabase
-        .from("Rooms")
-        .select("id, current_image_url")
-        .eq("room_code", roomCode)
-        .single();
+      setLoadingRoom(true);
 
-      if (!room) return;
-      currentRoomId = room.id;
-      setRoomId(room.id);
+      const { data: roomData, error: roomError } = await supabase
+        .from('Rooms')
+        .select(
+          'id, current_image_url, current_word, current_forbidden_words, current_prompt, winner_nickname, status, guess_ends_at'
+        )
+        .eq('room_code', roomCode)
+        .single<RoomData>();
 
-      if (room.current_image_url) {
-        setImageContent(<img src={room.current_image_url} alt="Generated" className="max-w-full rounded-xl" />);
+      if (roomError || !roomData) {
+        setLoadingRoom(false);
+        setMessage(roomError?.message || 'Could not load room.');
+        return;
       }
 
-      const { data: existing } = await supabase
-        .from("Guesses")
-        .select("*")
-        .eq("room_id", room.id);
+      setRoom(roomData);
+      setTimeLeft(getSecondsRemaining(roomData.guess_ends_at));
 
-      if (existing) {
-        setGuesses(existing.map((g: any) => ({
+      if (roomData.winner_nickname) {
+        setRoundOver(true);
+        setWinnerName(roomData.winner_nickname);
+      } else {
+        setRoundOver(roomData.status === 'finished');
+      }
+
+      const { data: existingGuesses, error: guessError } = await supabase
+        .from('Guesses')
+        .select('id, nickname, guess_text, is_correct, created_at')
+        .eq('room_id', roomData.id)
+        .order('created_at', { ascending: true });
+
+      if (guessError) {
+        setMessage(guessError.message);
+      } else {
+        const mapped: GuessRow[] = (existingGuesses || []).map((g: any) => ({
+          id: g.id,
+          nickname: g.nickname,
           text: g.guess_text,
           correct: g.is_correct,
-          points: g.is_correct ? "+50 pts" : "",
-        })));
-        if (existing.some((g: any) => g.nickname === nickname && g.is_correct)) {
+          createdAt: g.created_at,
+        }));
+
+        setGuesses(mapped);
+
+        const correctGuess = mapped.find((g) => g.correct);
+        if (correctGuess) {
+          setRoundOver(true);
+          setWinnerName(correctGuess.nickname);
+        }
+
+        if (mapped.some((g) => g.nickname === nickname && g.correct)) {
           setSubmitted(true);
         }
       }
+
+      setLoadingRoom(false);
     }
 
     init();
 
-    const channel = supabase
+    channel = supabase
       .channel(`guess-room-${roomCode}`)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "Rooms",
-        filter: `room_code=eq.${roomCode}`,
-      }, (payload) => {
-        const url = (payload.new as any).current_image_url;
-        if (url) {
-          setImageContent(<img src={url} alt="Generated" className="max-w-full rounded-xl" />);
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'Rooms',
+          filter: `room_code=eq.${roomCode}`,
+        },
+        (payload) => {
+          const nextRoom = payload.new as RoomData;
+
+          setRoom(nextRoom);
+          setTimeLeft(getSecondsRemaining(nextRoom.guess_ends_at));
+
+          if (nextRoom.status === 'prompting') {
+            setRoundOver(false);
+            setWinnerName(null);
+            setSubmitted(false);
+            setGuessInput('');
+            setGuesses([]);
+            setShowPrompt(false);
+            setFirstLetterRevealed(false);
+            setRevealedForbiddenWords([]);
+            setMessage('Next round starting...');
+          }
+
+          if (nextRoom.status === 'guessing') {
+            setRoundOver(false);
+            setWinnerName(null);
+          }
+
+          if (nextRoom.winner_nickname) {
+            setRoundOver(true);
+            setWinnerName(nextRoom.winner_nickname);
+            setMessage(`${nextRoom.winner_nickname} guessed the word!`);
+          }
+
+          if (nextRoom.status === 'finished' && !nextRoom.winner_nickname) {
+            setRoundOver(true);
+          }
         }
-      })
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "Guesses",
-      }, (payload) => {
-        const g = payload.new as any;
-        if (g.room_id === currentRoomId) {
-          setGuesses((prev) => [...prev, {
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'Guesses',
+        },
+        (payload) => {
+          const g = payload.new as any;
+
+          if (room?.id && g.room_id !== room.id) return;
+
+          const nextGuess: GuessRow = {
+            id: g.id,
+            nickname: g.nickname,
             text: g.guess_text,
             correct: g.is_correct,
-            points: g.is_correct ? "+50 pts" : "",
-          }]);
+            createdAt: g.created_at,
+          };
+
+          setGuesses((prev) => {
+            if (prev.some((existing) => existing.id === nextGuess.id)) return prev;
+            return [...prev, nextGuess];
+          });
+
+          if (g.is_correct) {
+            setRoundOver(true);
+            setWinnerName(g.nickname);
+            setMessage(`${g.nickname} guessed the word!`);
+
+            if (g.nickname === nickname) {
+              setSubmitted(true);
+            }
+          }
         }
-      })
+      )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, [roomCode, nickname]);
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [roomCode, nickname, room?.id]);
 
-  const handleBackToGame = () => {
-    if (window.history.length > 1) {
-      window.history.back();
-      return;
-    }
+  useEffect(() => {
+    if (!room?.guess_ends_at || roundOver) return;
 
-    setMessage("No previous page in history, so Back to Game could not navigate anywhere.");
-  };
+    const timer = window.setInterval(() => {
+      const next = getSecondsRemaining(room.guess_ends_at);
+      setTimeLeft(next);
+
+      if (next <= 0) {
+        setRoundOver(true);
+        setMessage((prev) => prev || 'Time is up.');
+        window.clearInterval(timer);
+      }
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [room?.guess_ends_at, roundOver]);
 
   const handleTogglePrompt = () => {
-    setShowPrompt((prev) => {
-      const nextValue = !prev;
-      setMessage(nextValue ? "Prompt revealed." : "Prompt hidden.");
-      return nextValue;
-    });
+    if (!promptUsed) return;
+    setShowPrompt((prev) => !prev);
   };
 
   const handleGuessSubmit = async () => {
     const trimmedGuess = guessInput.trim();
 
-    if (!trimmedGuess) { setMessage("Type a guess first."); return; }
-    if (submitted) { setMessage("You already guessed correctly this round."); return; }
-    if (!roomId) { setMessage("Not connected to a room."); return; }
+    if (!trimmedGuess) {
+      setMessage('Type a guess first.');
+      return;
+    }
 
-    const isCorrect = trimmedGuess.toLowerCase().includes("eiffel");
+    if (!room?.id) {
+      setMessage('Not connected to a room.');
+      return;
+    }
 
-    const { error } = await supabase.from("Guesses").insert({
-      room_id: roomId,
+    if (!hasImage) {
+      setMessage('Wait for the image first.');
+      return;
+    }
+
+    if (roomStatus !== 'guessing') {
+      setMessage('This round is not accepting guesses right now.');
+      return;
+    }
+
+    if (roundOver || timeLeft <= 0) {
+      setMessage('This round is already over.');
+      return;
+    }
+
+    if (submitted) {
+      setMessage('You already guessed correctly this round.');
+      return;
+    }
+
+    if (!answer) {
+      setMessage('No answer is stored for this room yet.');
+      return;
+    }
+
+    const isCorrect = guessesMatch(trimmedGuess, answer);
+
+    const { error: insertError } = await supabase.from('Guesses').insert({
+      room_id: room.id,
       nickname,
       guess_text: trimmedGuess,
       is_correct: isCorrect,
     });
 
-    if (error) { setMessage(`Failed to submit: ${error.message}`); return; }
-
-    setGuessInput("");
+    if (insertError) {
+      setMessage(`Failed to submit: ${insertError.message}`);
+      return;
+    }
 
     if (isCorrect) {
+      const { error: roomUpdateError } = await supabase
+        .from('Rooms')
+        .update({
+          winner_nickname: nickname,
+          status: 'finished',
+        })
+        .eq('id', room.id);
+
+      if (roomUpdateError) {
+        setMessage(`Guess saved, but winner update failed: ${roomUpdateError.message}`);
+        setGuessInput('');
+        return;
+      }
+
       setSubmitted(true);
-      setScoreboard((prev) =>
-        prev.map((player, index) =>
-          index === 0 ? { ...player, points: player.points + 50 } : player
-        )
-      );
+      setRoundOver(true);
+      setWinnerName(nickname);
+      setMessage('Nice — correct guess!');
+    } else {
+      setMessage('Guess submitted.');
     }
 
-    setMessage(isCorrect ? "Nice — correct guess! +50 points added." : "Guess submitted.");
+    setGuessInput('');
   };
 
-  const handlePromptPass = () => {
-    if (promptPassUsed) {
-      setMessage("You already used Prompt Pass this round.");
+  const handleRevealFirstLetter = () => {
+    if (!canUseHints) {
+      setMessage('Hints are not available yet.');
       return;
     }
 
-    if (inkCredits < 10) {
-      setMessage("Not enough ink credits for Prompt Pass.");
+    if (firstLetterRevealed) {
+      setMessage('You already revealed the first letter.');
       return;
     }
 
-    setInkCredits((prev) => prev - 10);
-    setPromptPassUsed(true);
-    setTimeLeft(60);
-    setMessage("Prompt Pass activated. Timer refreshed to 60s for demo purposes.");
+    if (inkCredits < 5) {
+      setMessage('Not enough Ink Credits for that hint.');
+      return;
+    }
+
+    setInkCredits((prev) => prev - 5);
+    setFirstLetterRevealed(true);
+    setMessage('First-letter hint unlocked.');
+  };
+
+  const handleRevealForbiddenWord = () => {
+    if (!canUseHints) {
+      setMessage('Hints are not available yet.');
+      return;
+    }
+
+    if (revealedForbiddenWords.length >= forbiddenWords.length) {
+      setMessage('All forbidden-word hints are already revealed.');
+      return;
+    }
+
+    if (inkCredits < 7) {
+      setMessage('Not enough Ink Credits for that hint.');
+      return;
+    }
+
+    const remaining = forbiddenWords.filter((word) => !revealedForbiddenWords.includes(word));
+    if (remaining.length === 0) {
+      setMessage('No forbidden words left to reveal.');
+      return;
+    }
+
+    const nextWord = remaining[Math.floor(Math.random() * remaining.length)];
+
+    setInkCredits((prev) => prev - 7);
+    setRevealedForbiddenWords((prev) => [...prev, nextWord]);
+    setMessage('Forbidden-word hint unlocked.');
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
+    if (event.key === 'Enter') {
       handleGuessSubmit();
     }
   };
 
-  const handleLoadDemoImage = () => {
-    setImageContent(
-      <div className="text-[120px] leading-none drop-shadow-[0_8px_24px_rgba(0,0,0,0.45)]">🗼</div>
-    );
-    setMessage("Demo image loaded.");
-  };
-
-  const handleClearBoard = () => {
-    setGuesses([]);
-    setScoreboard(players);
-    setGuessInput("");
-    setImageContent(null);
-    setShowPrompt(false);
-    setPromptPassUsed(false);
-    setInkCredits(startingInkCredits);
-    setTimeLeft(startingTime);
-    setMessage("Board cleared and ready for your own game logic.");
-  };
+  const firstLetterHint = firstLetterRevealed && answer ? answer.charAt(0).toUpperCase() : null;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#030712] text-white">
@@ -246,26 +446,27 @@ export default function GuessPageUI() {
       <div className="relative mx-auto max-w-[1280px] px-6 py-6">
         <div className="mb-8 flex items-center justify-between text-sm">
           <button
-            onClick={handleBackToGame}
+            onClick={() => window.history.back()}
             className="flex items-center gap-2 text-violet-300 transition hover:text-violet-200"
             type="button"
           >
             <span className="text-xl">←</span>
-            <span className="font-medium">Back to Game</span>
+            <span className="font-medium">Back</span>
           </button>
 
           <div className="text-center">
             <p className="text-xs uppercase tracking-[0.25em] text-white/45">Room Code</p>
-            <p className="text-3xl font-black tracking-wide text-amber-300">PROMPT42</p>
+            <p className="text-3xl font-black tracking-wide text-amber-300">{roomCode || '—'}</p>
           </div>
 
           <button
             onClick={handleTogglePrompt}
-            className="flex items-center gap-2 text-emerald-300 transition hover:text-emerald-200"
+            className="flex items-center gap-2 text-emerald-300 transition hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
+            disabled={!promptUsed}
           >
             <span>👁</span>
-            <span className="font-medium">{showPrompt ? "Hide Prompt" : "View Prompt"}</span>
+            <span className="font-medium">{showPrompt ? 'Hide Prompt' : 'View Prompt'}</span>
           </button>
         </div>
 
@@ -273,15 +474,16 @@ export default function GuessPageUI() {
           <div className="space-y-6">
             <section>
               <p className="mb-4 text-sm uppercase tracking-[0.22em] text-white/45">
-                {connectedPlayers.length} Players in Room
+                {scoreboard.length} Players Seen
               </p>
-              <div className="flex gap-4">
-                {scoreboard.map((player) => (
+              <div className="flex flex-wrap gap-4">
+                {scoreboard.map((player, index) => (
                   <div
                     key={player.id}
                     className={`grid h-16 w-16 place-items-center rounded-full ${player.color} text-2xl font-black text-black shadow-[0_0_30px_rgba(255,255,255,0.05)]`}
+                    title={player.name}
                   >
-                    {player.id}
+                    {player.name.charAt(0).toUpperCase() || index + 1}
                   </div>
                 ))}
               </div>
@@ -291,55 +493,58 @@ export default function GuessPageUI() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="mb-3 text-sm font-medium uppercase tracking-[0.25em] text-amber-300/80">
-                    Round 1 of 5
+                    Current Round
                   </p>
-                  <h1 className="text-5xl font-semibold tracking-tight text-white">Guess the Image</h1>
+                  <h1 className="text-5xl font-semibold tracking-tight text-white">
+                    {loadingRoom
+                      ? 'Loading Room...'
+                      : roomStatus === 'prompting'
+                      ? 'Waiting for Prompt'
+                      : roundOver
+                      ? 'Round Finished'
+                      : 'Guess the Image'}
+                  </h1>
                 </div>
+
                 <div className="text-right">
                   <p className="text-sm uppercase tracking-[0.25em] text-white/45">Time Left</p>
-                  <p className="text-6xl font-black text-amber-300">{timeLeft}s</p>
+                  <p className="text-6xl font-black text-amber-300">
+                    {roundOver ? '0s' : `${timeLeft}s`}
+                  </p>
                 </div>
               </div>
             </section>
 
             <section className="rounded-[40px] border border-amber-300/25 bg-[linear-gradient(135deg,rgba(139,92,246,0.18),rgba(56,189,248,0.10),rgba(16,185,129,0.12))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
               <div className="flex min-h-[420px] flex-col items-center justify-center gap-5 rounded-[32px] border border-white/10 bg-black/10 px-6 text-center backdrop-blur-sm">
-                {imageContent ? (
-                  imageContent
+                {loadingRoom ? (
+                  <>
+                    <p className="text-lg font-medium text-white/70">Loading room...</p>
+                    <p className="max-w-md text-sm leading-relaxed text-white/35">
+                      Pulling the latest game state from Supabase.
+                    </p>
+                  </>
+                ) : hasImage ? (
+                  <img
+                    src={imageUrl}
+                    alt="Generated"
+                    className="max-h-[520px] w-auto max-w-full rounded-xl object-contain"
+                  />
                 ) : (
                   <>
-                    <p className="text-lg font-medium text-white/55">No image loaded yet</p>
+                    <p className="text-lg font-medium text-white/55">Waiting for the prompter to finish</p>
                     <p className="max-w-md text-sm leading-relaxed text-white/35">
-                      This area is intentionally empty so you can connect it to your own drawing, upload,
-                      prompt, or multiplayer game state later.
+                      The image will appear here as soon as the prompt is submitted and generated.
                     </p>
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                      <button
-                        onClick={handleLoadDemoImage}
-                        type="button"
-                        className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/75 transition hover:bg-white/10"
-                      >
-                        Load Demo Image
-                      </button>
-                      <button
-                        onClick={handleClearBoard}
-                        type="button"
-                        className="rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-400/15"
-                      >
-                        Clear Board
-                      </button>
-                    </div>
                   </>
                 )}
               </div>
             </section>
 
-            {showPrompt && (
+            {showPrompt && promptUsed && (
               <section className="rounded-[28px] border border-white/10 bg-black/25 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm">
                 <p className="mb-4 text-sm uppercase tracking-[0.22em] text-white/55">The Prompt Used</p>
-                <p className="text-2xl font-medium leading-relaxed text-white/80">
-                  “A rusted iron A-shaped structure reaching the clouds in a city of baguettes and berets”
-                </p>
+                <p className="text-2xl font-medium leading-relaxed text-white/80">“{promptUsed}”</p>
               </section>
             )}
 
@@ -349,19 +554,30 @@ export default function GuessPageUI() {
                   value={guessInput}
                   onChange={(event) => setGuessInput(event.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Make your guess..."
+                  placeholder={canGuess ? 'Make your guess...' : 'Waiting for active round...'}
                   className="h-16 flex-1 rounded-[24px] bg-transparent px-5 text-xl text-white outline-none placeholder:text-white/35"
+                  disabled={!canGuess}
                 />
                 <button
                   onClick={handleGuessSubmit}
-                  className="rounded-[20px] bg-amber-400 px-8 text-xl font-bold text-black transition hover:scale-[1.02] hover:bg-amber-300"
+                  className="rounded-[20px] bg-amber-400 px-8 text-xl font-bold text-black transition hover:scale-[1.02] hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
+                  disabled={!canGuess}
                 >
                   Guess
                 </button>
               </div>
+
               <div className="mt-3 flex items-center justify-between gap-4 px-2 text-sm">
-                <p className="text-white/40">Press Enter or click Guess to submit</p>
+                <p className="text-white/40">
+                  {roundOver
+                    ? winnerName
+                      ? `${winnerName} won this round`
+                      : 'Round over'
+                    : roomStatus === 'prompting'
+                    ? 'Waiting for the prompter to start the guessing phase'
+                    : 'Press Enter or click Guess to submit'}
+                </p>
                 <p className="text-right text-emerald-300/90">{message}</p>
               </div>
             </section>
@@ -371,35 +587,42 @@ export default function GuessPageUI() {
             <section className="rounded-[28px] border border-emerald-400/15 bg-[linear-gradient(180deg,rgba(16,185,129,0.08),rgba(16,185,129,0.03))] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm">
               <div className="mb-5 flex items-center justify-between">
                 <p className="text-sm uppercase tracking-[0.22em] text-emerald-300">Guesses</p>
-                <p className="text-sm font-semibold text-emerald-300/80">
-                  ({guesses.length})
-                </p>
+                <p className="text-sm font-semibold text-emerald-300/80">({guesses.length})</p>
               </div>
 
               {guesses.length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-center text-white/45">
-                  No guesses yet. This panel is ready to receive live guesses from your game logic.
+                  No guesses yet.
                 </div>
               ) : (
                 <div className="space-y-3">
                   {guesses.map((guess) => (
                     <div
-                      key={`${guess.text}-${guess.points}`}
-                      className={`flex items-center justify-between rounded-2xl px-4 py-4 ${
-                        guess.correct ? "bg-emerald-400/14" : "bg-violet-400/10"
+                      key={guess.id}
+                      className={`rounded-2xl px-4 py-4 ${
+                        guess.correct ? 'bg-emerald-400/14' : 'bg-violet-400/10'
                       }`}
                     >
-                      <div className="flex items-center gap-3 text-lg font-semibold text-white/90">
-                        <span
-                          className={`grid h-7 w-7 place-items-center rounded-full text-sm ${
-                            guess.correct ? "bg-emerald-400/20 text-emerald-300" : "bg-red-400/20 text-red-400"
-                          }`}
-                        >
-                          {guess.correct ? "✓" : "✕"}
-                        </span>
-                        <span>{guess.text}</span>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 text-lg font-semibold text-white/90">
+                          <span
+                            className={`grid h-7 w-7 place-items-center rounded-full text-sm ${
+                              guess.correct
+                                ? 'bg-emerald-400/20 text-emerald-300'
+                                : 'bg-red-400/20 text-red-400'
+                            }`}
+                          >
+                            {guess.correct ? '✓' : '✕'}
+                          </span>
+                          <span>{guess.text}</span>
+                        </div>
+
+                        {guess.correct && (
+                          <span className="text-lg font-bold text-emerald-300">+50 pts</span>
+                        )}
                       </div>
-                      {guess.points && <span className="text-lg font-bold text-emerald-300">{guess.points}</span>}
+
+                      <p className="mt-2 text-sm text-white/45">by {guess.nickname}</p>
                     </div>
                   ))}
                 </div>
@@ -412,8 +635,10 @@ export default function GuessPageUI() {
                 {scoreboard.map((player) => (
                   <div key={player.id} className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                      <div className={`grid h-14 w-14 place-items-center rounded-full ${player.color} text-xl font-black text-black`}>
-                        {player.id}
+                      <div
+                        className={`grid h-14 w-14 place-items-center rounded-full ${player.color} text-xl font-black text-black`}
+                      >
+                        {player.name.charAt(0).toUpperCase()}
                       </div>
                       <span className="text-3xl font-semibold text-white/90">{player.name}</span>
                     </div>
@@ -431,13 +656,47 @@ export default function GuessPageUI() {
 
               <div className="space-y-3">
                 <button
-                  onClick={handlePromptPass}
+                  onClick={handleRevealFirstLetter}
                   className="w-full rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-lg font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={promptPassUsed || inkCredits < 10}
+                  disabled={firstLetterRevealed || inkCredits < 5 || !canGuess}
                   type="button"
                 >
-                  {promptPassUsed ? "✓ Prompt Pass Used" : "✦ Prompt Pass (10 cr)"}
+                  {firstLetterRevealed ? '✓ First Letter Revealed' : '✦ First Letter Hint (5 cr)'}
                 </button>
+
+                <button
+                  onClick={handleRevealForbiddenWord}
+                  className="w-full rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/10 px-5 py-4 text-lg font-semibold text-fuchsia-200 transition hover:bg-fuchsia-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={
+                    !canGuess ||
+                    inkCredits < 7 ||
+                    !canUseHints ||
+                    revealedForbiddenWords.length >= forbiddenWords.length
+                  }
+                  type="button"
+                >
+                  {revealedForbiddenWords.length > 0
+                    ? '✦ Reveal Another Forbidden Word (7 cr)'
+                    : '✦ Forbidden Word Hint (7 cr)'}
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/45">First Letter</p>
+                  <p className="mt-1 text-lg font-semibold text-white/85">
+                    {firstLetterHint ?? 'Not revealed yet'}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/45">Forbidden Words Revealed</p>
+                  <p className="mt-1 text-lg font-semibold text-white/85">
+                    {revealedForbiddenWords.length > 0
+                      ? revealedForbiddenWords.join(', ')
+                      : 'None yet'}
+                  </p>
+                </div>
               </div>
             </section>
           </aside>
