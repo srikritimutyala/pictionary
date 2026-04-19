@@ -73,33 +73,50 @@ export default function GuessPageUI() {
   const [revealedForbiddenWords, setRevealedForbiddenWords] = useState<string[]>([]);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [nickname, setNickname] = useState("");
-  const [roomCode, setRoomCode] = useState("");
+  const [nickname] = useState(() => typeof window !== "undefined" ? localStorage.getItem("nickname") || "Unknown" : "Unknown");
+  const [roomCode] = useState(() => typeof window !== "undefined" ? localStorage.getItem("roomCode") || "" : "");
 
-  useEffect(() => {
-    setNickname(localStorage.getItem("nickname") || "Unknown");
-    setRoomCode(localStorage.getItem("roomCode") || "");
-  }, []);
-
-  // Resolve room ID, load existing guesses, check if already guessed
   useEffect(() => {
     if (!roomCode) return;
 
-    // Load existing image on mount
-    supabase
-      .from("Rooms")
-      .select("current_image_url")
-      .eq("room_code", roomCode)
-      .single()
-      .then(({ data }) => {
-        if (data?.current_image_url) {
-          setImageContent(<img src={data.current_image_url} alt="Generated" className="max-w-full rounded-xl" />);
-        }
-      });
+    let currentRoomId: number | null = null;
 
-    // Subscribe to realtime updates
+    async function init() {
+      const { data: room } = await supabase
+        .from("Rooms")
+        .select("id, current_image_url")
+        .eq("room_code", roomCode)
+        .single();
+
+      if (!room) return;
+      currentRoomId = room.id;
+      setRoomId(room.id);
+
+      if (room.current_image_url) {
+        setImageContent(<img src={room.current_image_url} alt="Generated" className="max-w-full rounded-xl" />);
+      }
+
+      const { data: existing } = await supabase
+        .from("Guesses")
+        .select("*")
+        .eq("room_id", room.id);
+
+      if (existing) {
+        setGuesses(existing.map((g: any) => ({
+          text: g.text,
+          correct: g.is_correct,
+          points: g.is_correct ? "+50 pts" : "",
+        })));
+        if (existing.some((g: any) => g.nickname === nickname && g.is_correct)) {
+          setSubmitted(true);
+        }
+      }
+    }
+
+    init();
+
     const channel = supabase
-      .channel(`room-${roomCode}`)
+      .channel(`guess-room-${roomCode}`)
       .on("postgres_changes", {
         event: "UPDATE",
         schema: "public",
@@ -111,10 +128,24 @@ export default function GuessPageUI() {
           setImageContent(<img src={url} alt="Generated" className="max-w-full rounded-xl" />);
         }
       })
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "Guesses",
+      }, (payload) => {
+        const g = payload.new as any;
+        if (g.room_id === currentRoomId) {
+          setGuesses((prev) => [...prev, {
+            text: g.text,
+            correct: g.is_correct,
+            points: g.is_correct ? "+50 pts" : "",
+          }]);
+        }
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [roomCode]);
+  }, [roomCode, nickname]);
 
   const handleBackToGame = () => {
     if (window.history.length > 1) {
@@ -133,7 +164,7 @@ export default function GuessPageUI() {
     });
   };
 
-  const handleGuessSubmit = () => {
+  const handleGuessSubmit = async () => {
     const trimmedGuess = guessInput.trim();
 
     if (!trimmedGuess) { setMessage("Type a guess first."); return; }
@@ -142,13 +173,15 @@ export default function GuessPageUI() {
 
     const isCorrect = trimmedGuess.toLowerCase().includes("eiffel");
 
-    const newGuess: Guess = {
+    const { error } = await supabase.from("Guesses").insert({
+      room_id: roomId,
+      nickname,
       text: trimmedGuess,
-      correct: isCorrect,
-      points: isCorrect ? "+50 pts" : "",
-    };
+      is_correct: isCorrect,
+    });
 
-    setGuesses((prev) => [...prev, newGuess]);
+    if (error) { setMessage(`Failed to submit: ${error.message}`); return; }
+
     setGuessInput("");
 
     if (isCorrect) {
