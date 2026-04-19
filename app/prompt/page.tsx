@@ -81,21 +81,34 @@ const PromptCreator = () => {
       // Upload image to Supabase Storage and broadcast to guessers
       const roomCode = localStorage.getItem('roomCode');
       if (roomCode) {
-        const blob = await fetch(img.src).then((r) => r.blob());
+        // Convert image to blob via canvas (works reliably with Puter blob URLs)
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width || 512;
+        canvas.height = img.naturalHeight || img.height || 512;
+        const ctx = canvas.getContext('2d');
+        ctx!.drawImage(img, 0, 0);
+        const blob = await new Promise<Blob>((resolve, reject) =>
+          canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/png')
+        );
+
         const fileName = `${roomCode}-${Date.now()}.png`;
         const { error: uploadError } = await supabase.storage
           .from('game-images')
           .upload(fileName, blob, { contentType: 'image/png', upsert: true });
 
-        if (!uploadError) {
+        if (uploadError) {
+          alert(`Image upload failed: ${uploadError.message}`);
+        } else {
           const { data: { publicUrl } } = supabase.storage
             .from('game-images')
             .getPublicUrl(fileName);
 
-          await supabase
-            .from('rooms')
+          const { error: updateError } = await supabase
+            .from('Rooms')
             .update({ current_image_url: publicUrl })
             .eq('room_code', roomCode);
+
+          if (updateError) alert(`Room update failed: ${updateError.message}`);
         }
       }
     } finally {

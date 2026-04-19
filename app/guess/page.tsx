@@ -77,7 +77,7 @@ export default function GuessPageUI() {
 
     // Load existing image on mount
     supabase
-      .from("rooms")
+      .from("Rooms")
       .select("current_image_url")
       .eq("room_code", roomCode)
       .single()
@@ -93,7 +93,7 @@ export default function GuessPageUI() {
       .on("postgres_changes", {
         event: "UPDATE",
         schema: "public",
-        table: "rooms",
+        table: "Rooms",
         filter: `room_code=eq.${roomCode}`,
       }, (payload) => {
         const url = (payload.new as any).current_image_url;
