@@ -60,6 +60,9 @@ export default function GuessPageUI() {
   const startingInkCredits = 28;
   const startingTime = 45;
 
+  const originalWord = "Eiffel Tower";
+  const forbiddenWords = ["PARIS", "FRANCE", "TOWER"];
+
   const [guessInput, setGuessInput] = useState("");
   const [guesses, setGuesses] = useState<Guess[]>([]);
   const [scoreboard, setScoreboard] = useState<Player[]>(players);
@@ -67,8 +70,44 @@ export default function GuessPageUI() {
   const [timeLeft, setTimeLeft] = useState(startingTime);
   const [showPrompt, setShowPrompt] = useState(false);
   const [message, setMessage] = useState("");
-  const [promptPassUsed, setPromptPassUsed] = useState(false);
   const [imageContent, setImageContent] = useState<ReactNode>(null);
+
+  const [firstLetterRevealed, setFirstLetterRevealed] = useState(false);
+  const [revealedForbiddenWords, setRevealedForbiddenWords] = useState<string[]>([]);
+
+  const handleRevealFirstLetter = () => {
+    if (firstLetterRevealed) {
+      setMessage("First letter has already been revealed.");
+      return;
+    }
+
+    if (inkCredits < 5) {
+      setMessage("Not enough ink credits to reveal the first letter.");
+      return;
+    }
+
+    setInkCredits((prev) => prev - 5);
+    setFirstLetterRevealed(true);
+    setMessage(`First letter revealed: ${originalWord.charAt(0).toUpperCase()}`);
+  };
+
+  const handleRevealForbiddenWord = () => {
+    if (revealedForbiddenWords.length >= forbiddenWords.length) {
+      setMessage("All forbidden words have already been revealed.");
+      return;
+    }
+
+    if (inkCredits < 5) {
+      setMessage("Not enough ink credits to reveal a forbidden word.");
+      return;
+    }
+
+    const nextWord = forbiddenWords[revealedForbiddenWords.length];
+
+    setInkCredits((prev) => prev - 5);
+    setRevealedForbiddenWords((prev) => [...prev, nextWord]);
+    setMessage(`Forbidden word revealed: ${nextWord}`);
+  };
 
   const handleBackToGame = () => {
     if (window.history.length > 1) {
@@ -123,23 +162,6 @@ export default function GuessPageUI() {
     setMessage(isCorrect ? "Nice — correct guess! +50 points added." : "Guess submitted.");
   };
 
-  const handlePromptPass = () => {
-    if (promptPassUsed) {
-      setMessage("You already used Prompt Pass this round.");
-      return;
-    }
-
-    if (inkCredits < 10) {
-      setMessage("Not enough ink credits for Prompt Pass.");
-      return;
-    }
-
-    setInkCredits((prev) => prev - 10);
-    setPromptPassUsed(true);
-    setTimeLeft(60);
-    setMessage("Prompt Pass activated. Timer refreshed to 60s for demo purposes.");
-  };
-
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
       handleGuessSubmit();
@@ -159,9 +181,10 @@ export default function GuessPageUI() {
     setGuessInput("");
     setImageContent(null);
     setShowPrompt(false);
-    setPromptPassUsed(false);
     setInkCredits(startingInkCredits);
     setTimeLeft(startingTime);
+    setFirstLetterRevealed(false);
+    setRevealedForbiddenWords([]);
     setMessage("Board cleared and ready for your own game logic.");
   };
 
@@ -352,20 +375,55 @@ export default function GuessPageUI() {
 
             <section className="rounded-[28px] border border-fuchsia-400/15 bg-[linear-gradient(180deg,rgba(168,85,247,0.08),rgba(0,0,0,0.12))] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm">
               <div className="mb-6 flex items-center justify-between">
-                <p className="text-sm uppercase tracking-[0.22em] text-fuchsia-300">Your Ink Credits</p>
-                <p className="text-4xl font-black text-amber-300">{inkCredits}</p>
-              </div>
+    <p className="text-sm uppercase tracking-[0.22em] text-fuchsia-300">Your Ink Credits</p>
+    <p className="text-4xl font-black text-amber-300">{inkCredits}</p>
+  </div>
 
-              <div className="space-y-3">
-                <button
-                  onClick={handlePromptPass}
-                  className="w-full rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-lg font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={promptPassUsed || inkCredits < 10}
-                  type="button"
-                >
-                  {promptPassUsed ? "✓ Prompt Pass Used" : "✦ Prompt Pass (10 cr)"}
-                </button>
-              </div>
+  <div className="space-y-3">
+    <button
+      onClick={handleRevealFirstLetter}
+      className="w-full rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-lg font-semibold text-amber-200 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+      disabled={firstLetterRevealed || inkCredits < 5}
+      type="button"
+    >
+      {firstLetterRevealed ? "✓ First Letter Revealed" : "🔤 Reveal First Letter (5 cr)"}
+    </button>
+
+    <button
+      onClick={handleRevealForbiddenWord}
+      className="w-full rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-lg font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+      disabled={revealedForbiddenWords.length >= forbiddenWords.length || inkCredits < 5}
+      type="button"
+    >
+      {revealedForbiddenWords.length >= forbiddenWords.length
+        ? "✓ All Forbidden Words Revealed"
+        : "🚫 Reveal Forbidden Word (5 cr)"}
+    </button>
+  </div>
+
+  <div className="mt-4 space-y-2 text-sm text-white/70">
+    {firstLetterRevealed && (
+      <p>
+        First letter: <span className="font-bold text-amber-300">{originalWord.charAt(0).toUpperCase()}</span>
+      </p>
+    )}
+
+    {revealedForbiddenWords.length > 0 && (
+      <div>
+        <p className="mb-2">Revealed forbidden words:</p>
+        <div className="flex flex-wrap gap-2">
+          {revealedForbiddenWords.map((word) => (
+            <span
+              key={word}
+              className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-red-300"
+            >
+              {word}
+            </span>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
             </section>
           </aside>
         </div>
