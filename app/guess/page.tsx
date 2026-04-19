@@ -114,7 +114,7 @@ export default function GuessPageUI() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [roomCode]);
 
   const handleBackToGame = () => {
     if (window.history.length > 1) {
