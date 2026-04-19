@@ -103,7 +103,7 @@ export default function GuessPageUI() {
 
       if (existing) {
         setGuesses(existing.map((g: any) => ({
-          text: g.text,
+          text: g.guess_text,
           correct: g.is_correct,
           points: g.is_correct ? "+50 pts" : "",
         })));
@@ -136,7 +136,7 @@ export default function GuessPageUI() {
         const g = payload.new as any;
         if (g.room_id === currentRoomId) {
           setGuesses((prev) => [...prev, {
-            text: g.text,
+            text: g.guess_text,
             correct: g.is_correct,
             points: g.is_correct ? "+50 pts" : "",
           }]);
@@ -176,7 +176,7 @@ export default function GuessPageUI() {
     const { error } = await supabase.from("Guesses").insert({
       room_id: roomId,
       nickname,
-      text: trimmedGuess,
+      guess_text: trimmedGuess,
       is_correct: isCorrect,
     });
 
