@@ -137,11 +137,7 @@ export default function GuessPageUI() {
     const trimmedGuess = guessInput.trim();
 
     if (!trimmedGuess) { setMessage("Type a guess first."); return; }
-    if (submitted) { setMessage("You already used all available guesses this round."); return; }
-    if (guesses.filter((g) => g.nickname === nickname).length >= maxGuesses) {
-      setMessage("You already used all available guesses this round.");
-      return;
-    }
+    if (submitted) { setMessage("You already guessed correctly this round."); return; }
     if (!roomId) { setMessage("Not connected to a room."); return; }
 
     const isCorrect = trimmedGuess.toLowerCase().includes("eiffel");
@@ -154,9 +150,9 @@ export default function GuessPageUI() {
 
     setGuesses((prev) => [...prev, newGuess]);
     setGuessInput("");
-    setSubmitted(true);
 
     if (isCorrect) {
+      setSubmitted(true);
       setScoreboard((prev) =>
         prev.map((player, index) =>
           index === 0 ? { ...player, points: player.points + 50 } : player
@@ -343,7 +339,7 @@ export default function GuessPageUI() {
               <div className="mb-5 flex items-center justify-between">
                 <p className="text-sm uppercase tracking-[0.22em] text-emerald-300">Guesses</p>
                 <p className="text-sm font-semibold text-emerald-300/80">
-                  ({guesses.length}/{maxGuesses})
+                  ({guesses.length})
                 </p>
               </div>
 
