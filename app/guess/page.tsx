@@ -74,11 +74,11 @@ export default function GuessPageUI() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [message, setMessage] = useState("");
   const [imageContent, setImageContent] = useState<ReactNode>(null);
-<<<<<<< HEAD
-=======
+  const [promptPassUsed, setPromptPassUsed] = useState(false);
+  const [firstLetterRevealed, setFirstLetterRevealed] = useState(false);
+  const [revealedForbiddenWords, setRevealedForbiddenWords] = useState<string[]>([]);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
 
@@ -116,7 +116,7 @@ export default function GuessPageUI() {
     init();
   }, [roomCode, nickname]);
 
-  // Realtime subscription for new guesses
+  // Realtime subscription — new guesses appear instantly without refresh
   useEffect(() => {
     if (!roomId) return;
 
@@ -133,7 +133,6 @@ export default function GuessPageUI() {
 
     return () => { supabase.removeChannel(channel); };
   }, [roomId]);
->>>>>>> e3c9735 (guess logic works)
 
   const handleBackToGame = () => {
     if (window.history.length > 1) {
@@ -188,20 +187,29 @@ export default function GuessPageUI() {
   };
 
   const handlePromptPass = () => {
-    if (promptPassUsed) {
-      setMessage("You already used Prompt Pass this round.");
-      return;
-    }
-
-    if (inkCredits < 10) {
-      setMessage("Not enough ink credits for Prompt Pass.");
-      return;
-    }
-
+    if (promptPassUsed) { setMessage("You already used Prompt Pass this round."); return; }
+    if (inkCredits < 10) { setMessage("Not enough ink credits for Prompt Pass."); return; }
     setInkCredits((prev) => prev - 10);
     setPromptPassUsed(true);
     setTimeLeft(60);
     setMessage("Prompt Pass activated. Timer refreshed to 60s for demo purposes.");
+  };
+
+  const handleRevealFirstLetter = () => {
+    if (firstLetterRevealed) return;
+    if (inkCredits < 5) { setMessage("Not enough ink credits."); return; }
+    setInkCredits((prev) => prev - 5);
+    setFirstLetterRevealed(true);
+    setMessage("First letter revealed!");
+  };
+
+  const handleRevealForbiddenWord = () => {
+    const unrevealed = forbiddenWords.filter((w) => !revealedForbiddenWords.includes(w));
+    if (unrevealed.length === 0) return;
+    if (inkCredits < 5) { setMessage("Not enough ink credits."); return; }
+    setInkCredits((prev) => prev - 5);
+    setRevealedForbiddenWords((prev) => [...prev, unrevealed[0]]);
+    setMessage(`Revealed: ${unrevealed[0]}`);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -222,6 +230,7 @@ export default function GuessPageUI() {
     setImageContent(null);
     setShowPrompt(false);
     setPromptPassUsed(false);
+    setSubmitted(false);
     setInkCredits(startingInkCredits);
     setTimeLeft(startingTime);
     setFirstLetterRevealed(false);
@@ -418,55 +427,63 @@ export default function GuessPageUI() {
 
             <section className="rounded-[28px] border border-fuchsia-400/15 bg-[linear-gradient(180deg,rgba(168,85,247,0.08),rgba(0,0,0,0.12))] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm">
               <div className="mb-6 flex items-center justify-between">
-    <p className="text-sm uppercase tracking-[0.22em] text-fuchsia-300">Your Ink Credits</p>
-    <p className="text-4xl font-black text-amber-300">{inkCredits}</p>
-  </div>
+                <p className="text-sm uppercase tracking-[0.22em] text-fuchsia-300">Your Ink Credits</p>
+                <p className="text-4xl font-black text-amber-300">{inkCredits}</p>
+              </div>
 
-  <div className="space-y-3">
-    <button
-      onClick={handleRevealFirstLetter}
-      className="w-full rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-lg font-semibold text-amber-200 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-      disabled={firstLetterRevealed || inkCredits < 5}
-      type="button"
-    >
-      {firstLetterRevealed ? "✓ First Letter Revealed" : "🔤 Reveal First Letter (5 cr)"}
-    </button>
+              <div className="space-y-3">
+                <button
+                  onClick={handleRevealFirstLetter}
+                  className="w-full rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-lg font-semibold text-amber-200 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={firstLetterRevealed || inkCredits < 5}
+                  type="button"
+                >
+                  {firstLetterRevealed ? "✓ First Letter Revealed" : "🔤 Reveal First Letter (5 cr)"}
+                </button>
 
-    <button
-      onClick={handleRevealForbiddenWord}
-      className="w-full rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-lg font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-      disabled={revealedForbiddenWords.length >= forbiddenWords.length || inkCredits < 5}
-      type="button"
-    >
-      {revealedForbiddenWords.length >= forbiddenWords.length
-        ? "✓ All Forbidden Words Revealed"
-        : "🚫 Reveal Forbidden Word (5 cr)"}
-    </button>
-  </div>
+                <button
+                  onClick={handleRevealForbiddenWord}
+                  className="w-full rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-lg font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={revealedForbiddenWords.length >= forbiddenWords.length || inkCredits < 5}
+                  type="button"
+                >
+                  {revealedForbiddenWords.length >= forbiddenWords.length
+                    ? "✓ All Forbidden Words Revealed"
+                    : "🚫 Reveal Forbidden Word (5 cr)"}
+                </button>
 
-  <div className="mt-4 space-y-2 text-sm text-white/70">
-    {firstLetterRevealed && (
-      <p>
-        First letter: <span className="font-bold text-amber-300">{originalWord.charAt(0).toUpperCase()}</span>
-      </p>
-    )}
+                <button
+                  onClick={handlePromptPass}
+                  className="w-full rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-lg font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={promptPassUsed || inkCredits < 10}
+                  type="button"
+                >
+                  {promptPassUsed ? "✓ Prompt Pass Used" : "✦ Prompt Pass (10 cr)"}
+                </button>
+              </div>
 
-    {revealedForbiddenWords.length > 0 && (
-      <div>
-        <p className="mb-2">Revealed forbidden words:</p>
-        <div className="flex flex-wrap gap-2">
-          {revealedForbiddenWords.map((word) => (
-            <span
-              key={word}
-              className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-red-300"
-            >
-              {word}
-            </span>
-          ))}
-        </div>
-      </div>
-    )}
-  </div>
+              <div className="mt-4 space-y-2 text-sm text-white/70">
+                {firstLetterRevealed && (
+                  <p>
+                    First letter: <span className="font-bold text-amber-300">{originalWord.charAt(0).toUpperCase()}</span>
+                  </p>
+                )}
+                {revealedForbiddenWords.length > 0 && (
+                  <div>
+                    <p className="mb-2">Revealed forbidden words:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {revealedForbiddenWords.map((word) => (
+                        <span
+                          key={word}
+                          className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-red-300"
+                        >
+                          {word}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </section>
           </aside>
         </div>
