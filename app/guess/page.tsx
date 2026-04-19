@@ -69,7 +69,6 @@ export default function GuessPageUI() {
   const [message, setMessage] = useState("");
   const [promptPassUsed, setPromptPassUsed] = useState(false);
   const [imageContent, setImageContent] = useState<ReactNode>(null);
-  const [promptPassUsed, setPromptPassUsed] = useState(false);
   const [firstLetterRevealed, setFirstLetterRevealed] = useState(false);
   const [revealedForbiddenWords, setRevealedForbiddenWords] = useState<string[]>([]);
   const [roomId, setRoomId] = useState<string | null>(null);
