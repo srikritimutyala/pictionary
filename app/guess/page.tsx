@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useMemo, useState, useEffect, type KeyboardEvent, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 
 type Player = {
@@ -16,12 +16,10 @@ type ConnectedPlayer = {
   name: string;
 };
 
-type GuessRow = {
-  id: string;
-  nickname: string;
-  guess_text: string;
-  is_correct: boolean;
-  created_at: string;
+type Guess = {
+  text: string;
+  correct: boolean;
+  points: string;
 };
 
 export default function GuessPageUI() {
@@ -63,82 +61,57 @@ export default function GuessPageUI() {
   const startingInkCredits = 28;
   const startingTime = 45;
 
-  const originalWord = "Eiffel Tower";
-  const forbiddenWords = ["PARIS", "FRANCE", "TOWER"];
-
   const [guessInput, setGuessInput] = useState("");
-  const [guesses, setGuesses] = useState<GuessRow[]>([]);
+  const [guesses, setGuesses] = useState<Guess[]>([]);
   const [scoreboard, setScoreboard] = useState<Player[]>(players);
   const [inkCredits, setInkCredits] = useState(startingInkCredits);
   const [timeLeft, setTimeLeft] = useState(startingTime);
   const [showPrompt, setShowPrompt] = useState(false);
   const [message, setMessage] = useState("");
-  const [imageContent, setImageContent] = useState<ReactNode>(null);
   const [promptPassUsed, setPromptPassUsed] = useState(false);
-  const [firstLetterRevealed, setFirstLetterRevealed] = useState(false);
-  const [revealedForbiddenWords, setRevealedForbiddenWords] = useState<string[]>([]);
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [nickname, setNickname] = useState("");
-  const [roomCode, setRoomCode] = useState("");
+  const [imageContent, setImageContent] = useState<ReactNode>(null);
 
   useEffect(() => {
-    setNickname(localStorage.getItem("nickname") || "Unknown");
-    setRoomCode(localStorage.getItem("roomCode") || "");
-  }, []);
-
-  // Resolve room ID, load existing guesses, check if already guessed
-  useEffect(() => {
+    const roomCode = localStorage.getItem("roomCode");
     if (!roomCode) return;
 
-    async function init() {
-      const { data: room } = await supabase
-        .from("Rooms")
-        .select("id")
-        .eq("room_code", roomCode)
-        .maybeSingle();
-
-      if (!room) return;
-      setRoomId(room.id);
-
-      const { data: existing } = await supabase
-        .from("Guesses")
-        .select("*")
-        .eq("room_id", room.id)
-        .order("created_at", { ascending: true });
-
-      if (existing) {
-        setGuesses(existing);
-        if (existing.some((g) => g.nickname === nickname)) setSubmitted(true);
-      }
-    }
-
-    init();
-  }, [roomCode, nickname]);
-
-  // Realtime subscription — new guesses appear instantly without refresh
-  useEffect(() => {
-    if (!roomId) return;
-
-    const channel = supabase
-      .channel(`guesses-${roomId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "Guesses", filter: `room_id=eq.${roomId}` },
-        (payload) => {
-          setGuesses((prev) => [...prev, payload.new as GuessRow]);
+    // Load existing image on mount
+    supabase
+      .from("rooms")
+      .select("current_image_url")
+      .eq("room_code", roomCode)
+      .single()
+      .then(({ data }) => {
+        if (data?.current_image_url) {
+          setImageContent(<img src={data.current_image_url} alt="Generated" className="max-w-full rounded-xl" />);
         }
-      )
+      });
+
+    // Subscribe to realtime updates
+    const channel = supabase
+      .channel(`room-${roomCode}`)
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "rooms",
+        filter: `room_code=eq.${roomCode}`,
+      }, (payload) => {
+        const url = (payload.new as any).current_image_url;
+        if (url) {
+          setImageContent(<img src={url} alt="Generated" className="max-w-full rounded-xl" />);
+        }
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [roomId]);
+  }, []);
 
   const handleBackToGame = () => {
     if (window.history.length > 1) {
       window.history.back();
       return;
     }
+
     setMessage("No previous page in history, so Back to Game could not navigate anywhere.");
   };
 
@@ -150,30 +123,30 @@ export default function GuessPageUI() {
     });
   };
 
-  const handleGuessSubmit = async () => {
+  const handleGuessSubmit = () => {
     const trimmedGuess = guessInput.trim();
 
-    if (!trimmedGuess) { setMessage("Type a guess first."); return; }
-    if (submitted) { setMessage("You already used all available guesses this round."); return; }
-    if (guesses.filter((g) => g.nickname === nickname).length >= maxGuesses) {
+    if (!trimmedGuess) {
+      setMessage("Type a guess first.");
+      return;
+    }
+
+    if (guesses.length >= maxGuesses) {
       setMessage("You already used all available guesses this round.");
       return;
     }
-    if (!roomId) { setMessage("Not connected to a room."); return; }
 
-    const isCorrect = trimmedGuess.toLowerCase().includes("eiffel");
+    const loweredGuess = trimmedGuess.toLowerCase();
+    const isCorrect = loweredGuess.includes("eiffel");
 
-    const { error } = await supabase.from("Guesses").insert({
-      room_id: roomId,
-      nickname,
-      guess_text: trimmedGuess,
-      is_correct: isCorrect,
-    });
+    const newGuess: Guess = {
+      text: trimmedGuess,
+      correct: isCorrect,
+      points: isCorrect ? "+50 pts" : "",
+    };
 
-    if (error) { setMessage("Failed to submit guess."); return; }
-
+    setGuesses((prev) => [...prev, newGuess]);
     setGuessInput("");
-    setSubmitted(true);
 
     if (isCorrect) {
       setScoreboard((prev) =>
@@ -187,33 +160,26 @@ export default function GuessPageUI() {
   };
 
   const handlePromptPass = () => {
-    if (promptPassUsed) { setMessage("You already used Prompt Pass this round."); return; }
-    if (inkCredits < 10) { setMessage("Not enough ink credits for Prompt Pass."); return; }
+    if (promptPassUsed) {
+      setMessage("You already used Prompt Pass this round.");
+      return;
+    }
+
+    if (inkCredits < 10) {
+      setMessage("Not enough ink credits for Prompt Pass.");
+      return;
+    }
+
     setInkCredits((prev) => prev - 10);
     setPromptPassUsed(true);
     setTimeLeft(60);
     setMessage("Prompt Pass activated. Timer refreshed to 60s for demo purposes.");
   };
 
-  const handleRevealFirstLetter = () => {
-    if (firstLetterRevealed) return;
-    if (inkCredits < 5) { setMessage("Not enough ink credits."); return; }
-    setInkCredits((prev) => prev - 5);
-    setFirstLetterRevealed(true);
-    setMessage("First letter revealed!");
-  };
-
-  const handleRevealForbiddenWord = () => {
-    const unrevealed = forbiddenWords.filter((w) => !revealedForbiddenWords.includes(w));
-    if (unrevealed.length === 0) return;
-    if (inkCredits < 5) { setMessage("Not enough ink credits."); return; }
-    setInkCredits((prev) => prev - 5);
-    setRevealedForbiddenWords((prev) => [...prev, unrevealed[0]]);
-    setMessage(`Revealed: ${unrevealed[0]}`);
-  };
-
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") handleGuessSubmit();
+    if (event.key === "Enter") {
+      handleGuessSubmit();
+    }
   };
 
   const handleLoadDemoImage = () => {
@@ -230,11 +196,8 @@ export default function GuessPageUI() {
     setImageContent(null);
     setShowPrompt(false);
     setPromptPassUsed(false);
-    setSubmitted(false);
     setInkCredits(startingInkCredits);
     setTimeLeft(startingTime);
-    setFirstLetterRevealed(false);
-    setRevealedForbiddenWords([]);
     setMessage("Board cleared and ready for your own game logic.");
   };
 
@@ -256,7 +219,7 @@ export default function GuessPageUI() {
 
           <div className="text-center">
             <p className="text-xs uppercase tracking-[0.25em] text-white/45">Room Code</p>
-            <p className="text-3xl font-black tracking-wide text-amber-300">{roomCode || "PROMPT42"}</p>
+            <p className="text-3xl font-black tracking-wide text-amber-300">PROMPT42</p>
           </div>
 
           <button
@@ -338,7 +301,7 @@ export default function GuessPageUI() {
               <section className="rounded-[28px] border border-white/10 bg-black/25 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm">
                 <p className="mb-4 text-sm uppercase tracking-[0.22em] text-white/55">The Prompt Used</p>
                 <p className="text-2xl font-medium leading-relaxed text-white/80">
-                  &ldquo;A rusted iron A-shaped structure reaching the clouds in a city of baguettes and berets&rdquo;
+                  “A rusted iron A-shaped structure reaching the clouds in a city of baguettes and berets”
                 </p>
               </section>
             )}
@@ -350,13 +313,11 @@ export default function GuessPageUI() {
                   onChange={(event) => setGuessInput(event.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Make your guess..."
-                  disabled={submitted}
-                  className="h-16 flex-1 rounded-[24px] bg-transparent px-5 text-xl text-white outline-none placeholder:text-white/35 disabled:opacity-50"
+                  className="h-16 flex-1 rounded-[24px] bg-transparent px-5 text-xl text-white outline-none placeholder:text-white/35"
                 />
                 <button
                   onClick={handleGuessSubmit}
-                  className="rounded-[20px] bg-amber-400 px-8 text-xl font-bold text-black transition hover:scale-[1.02] hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={submitted}
+                  className="rounded-[20px] bg-amber-400 px-8 text-xl font-bold text-black transition hover:scale-[1.02] hover:bg-amber-300"
                   type="button"
                 >
                   Guess
@@ -374,7 +335,7 @@ export default function GuessPageUI() {
               <div className="mb-5 flex items-center justify-between">
                 <p className="text-sm uppercase tracking-[0.22em] text-emerald-300">Guesses</p>
                 <p className="text-sm font-semibold text-emerald-300/80">
-                  ({guesses.length})
+                  ({guesses.length}/{maxGuesses})
                 </p>
               </div>
 
@@ -386,22 +347,22 @@ export default function GuessPageUI() {
                 <div className="space-y-3">
                   {guesses.map((guess) => (
                     <div
-                      key={guess.id}
+                      key={`${guess.text}-${guess.points}`}
                       className={`flex items-center justify-between rounded-2xl px-4 py-4 ${
-                        guess.is_correct ? "bg-emerald-400/14" : "bg-violet-400/10"
+                        guess.correct ? "bg-emerald-400/14" : "bg-violet-400/10"
                       }`}
                     >
                       <div className="flex items-center gap-3 text-lg font-semibold text-white/90">
                         <span
                           className={`grid h-7 w-7 place-items-center rounded-full text-sm ${
-                            guess.is_correct ? "bg-emerald-400/20 text-emerald-300" : "bg-red-400/20 text-red-400"
+                            guess.correct ? "bg-emerald-400/20 text-emerald-300" : "bg-red-400/20 text-red-400"
                           }`}
                         >
-                          {guess.is_correct ? "✓" : "✕"}
+                          {guess.correct ? "✓" : "✕"}
                         </span>
-                        <span>{guess.guess_text}</span>
+                        <span>{guess.text}</span>
                       </div>
-                      <span className="text-white/40 text-xs">{guess.nickname}</span>
+                      {guess.points && <span className="text-lg font-bold text-emerald-300">{guess.points}</span>}
                     </div>
                   ))}
                 </div>
@@ -433,26 +394,6 @@ export default function GuessPageUI() {
 
               <div className="space-y-3">
                 <button
-                  onClick={handleRevealFirstLetter}
-                  className="w-full rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-lg font-semibold text-amber-200 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={firstLetterRevealed || inkCredits < 5}
-                  type="button"
-                >
-                  {firstLetterRevealed ? "✓ First Letter Revealed" : "🔤 Reveal First Letter (5 cr)"}
-                </button>
-
-                <button
-                  onClick={handleRevealForbiddenWord}
-                  className="w-full rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-lg font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={revealedForbiddenWords.length >= forbiddenWords.length || inkCredits < 5}
-                  type="button"
-                >
-                  {revealedForbiddenWords.length >= forbiddenWords.length
-                    ? "✓ All Forbidden Words Revealed"
-                    : "🚫 Reveal Forbidden Word (5 cr)"}
-                </button>
-
-                <button
                   onClick={handlePromptPass}
                   className="w-full rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-lg font-semibold text-violet-200 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={promptPassUsed || inkCredits < 10}
@@ -460,29 +401,6 @@ export default function GuessPageUI() {
                 >
                   {promptPassUsed ? "✓ Prompt Pass Used" : "✦ Prompt Pass (10 cr)"}
                 </button>
-              </div>
-
-              <div className="mt-4 space-y-2 text-sm text-white/70">
-                {firstLetterRevealed && (
-                  <p>
-                    First letter: <span className="font-bold text-amber-300">{originalWord.charAt(0).toUpperCase()}</span>
-                  </p>
-                )}
-                {revealedForbiddenWords.length > 0 && (
-                  <div>
-                    <p className="mb-2">Revealed forbidden words:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {revealedForbiddenWords.map((word) => (
-                        <span
-                          key={word}
-                          className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-red-300"
-                        >
-                          {word}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </section>
           </aside>

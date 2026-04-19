@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, ChangeEvent } from 'react';
 import cardsData from '@/data/taboo-cards.json';
+import { supabase } from '@/lib/supabase';
 
 type Card = {
   word: string;
@@ -76,6 +77,27 @@ const PromptCreator = () => {
       const puter = (window as any).puter;
       const img = await puter.ai.txt2img(prompt);
       setImageUrl(img.src);
+
+      // Upload image to Supabase Storage and broadcast to guessers
+      const roomCode = localStorage.getItem('roomCode');
+      if (roomCode) {
+        const blob = await fetch(img.src).then((r) => r.blob());
+        const fileName = `${roomCode}-${Date.now()}.png`;
+        const { error: uploadError } = await supabase.storage
+          .from('game-images')
+          .upload(fileName, blob, { contentType: 'image/png', upsert: true });
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('game-images')
+            .getPublicUrl(fileName);
+
+          await supabase
+            .from('rooms')
+            .update({ current_image_url: publicUrl })
+            .eq('room_code', roomCode);
+        }
+      }
     } finally {
       setGenerating(false);
     }
