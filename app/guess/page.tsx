@@ -74,6 +74,66 @@ export default function GuessPageUI() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [message, setMessage] = useState("");
   const [imageContent, setImageContent] = useState<ReactNode>(null);
+<<<<<<< HEAD
+=======
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const [nickname, setNickname] = useState("");
+  const [roomCode, setRoomCode] = useState("");
+
+  useEffect(() => {
+    setNickname(localStorage.getItem("nickname") || "Unknown");
+    setRoomCode(localStorage.getItem("roomCode") || "");
+  }, []);
+
+  // Resolve room ID, load existing guesses, check if already guessed
+  useEffect(() => {
+    if (!roomCode) return;
+
+    async function init() {
+      const { data: room } = await supabase
+        .from("Rooms")
+        .select("id")
+        .eq("room_code", roomCode)
+        .maybeSingle();
+
+      if (!room) return;
+      setRoomId(room.id);
+
+      const { data: existing } = await supabase
+        .from("Guesses")
+        .select("*")
+        .eq("room_id", room.id)
+        .order("created_at", { ascending: true });
+
+      if (existing) {
+        setGuesses(existing);
+        if (existing.some((g) => g.nickname === nickname)) setSubmitted(true);
+      }
+    }
+
+    init();
+  }, [roomCode, nickname]);
+
+  // Realtime subscription for new guesses
+  useEffect(() => {
+    if (!roomId) return;
+
+    const channel = supabase
+      .channel(`guesses-${roomId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "Guesses", filter: `room_id=eq.${roomId}` },
+        (payload) => {
+          setGuesses((prev) => [...prev, payload.new as GuessRow]);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [roomId]);
+>>>>>>> e3c9735 (guess logic works)
 
   const handleBackToGame = () => {
     if (window.history.length > 1) {
@@ -168,9 +228,6 @@ export default function GuessPageUI() {
     setRevealedForbiddenWords([]);
     setMessage("Board cleared and ready for your own game logic.");
   };
-
-  // Map supabase guesses to the display format the UI expects
-  const myGuesses = guesses.filter((g) => g.nickname === nickname);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#030712] text-white">
@@ -272,7 +329,7 @@ export default function GuessPageUI() {
               <section className="rounded-[28px] border border-white/10 bg-black/25 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm">
                 <p className="mb-4 text-sm uppercase tracking-[0.22em] text-white/55">The Prompt Used</p>
                 <p className="text-2xl font-medium leading-relaxed text-white/80">
-                  "A rusted iron A-shaped structure reaching the clouds in a city of baguettes and berets"
+                  &ldquo;A rusted iron A-shaped structure reaching the clouds in a city of baguettes and berets&rdquo;
                 </p>
               </section>
             )}
